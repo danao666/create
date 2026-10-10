@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f8f0df" />
+    <meta name="description" content="合成大耄耋：接住小耄耋，碰撞合成，看看能不能合出传说中的耄耋！" />
+    <title>合成大耄耋</title>
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="page-header">
+        <a class="wordmark" href="#" aria-label="合成大耄耋首页"><span class="wordmark-icon">耄</span> 耄耋研究所</a>
+        <span class="header-note">猫猫合成实验 · NO. 001</span>
+      </header>
+
+      <section class="game-layout" aria-label="合成大耄耋游戏">
+        <div class="intro">
+          <span class="eyebrow"><span class="eyebrow-dot"></span> 今日也要好好玩耍</span>
+          <h1>合成大<span class="title-highlight">耄耋</span></h1>
+          <p class="subtitle">小猫咪，合成大惊喜。</p>
+          <p class="description">瞄准，放下。两只相同的耄耋碰在一起，就会合成一只更大的！</p>
+          <div class="score-card" aria-label="游戏成绩">
+            <div class="score-item"><span class="score-label">本局得分</span><strong id="score">0</strong></div>
+            <span class="score-divider"></span>
+            <div class="score-item"><span class="score-label">历史最高</span><strong id="best-score">0</strong></div>
+          </div>
+          <div class="next-card"><span class="next-label">下一只耄耋</span><div class="next-preview" id="next-preview" aria-label="下一只猫咪"></div><span class="next-hint">提前想好放哪儿哦</span></div>
+          <div class="how-to-play"><span class="how-icon">✳</span><div><strong>怎么玩</strong><p>移动鼠标瞄准，点击投放<br />也可以用 ← → 移动，空格投放</p></div></div>
+        </div>
+
+        <div class="board-wrap">
+          <div class="board-topline"><span><i class="live-dot"></i> 猫猫实验进行中</span><span>№ <span id="round-number">001</span></span></div>
+          <div class="board-frame">
+            <canvas id="game" width="420" height="620" aria-label="游戏区域。移动鼠标或按方向键瞄准，点击或按空格投放。"></canvas>
+            <div class="overlay hidden" id="game-over" role="dialog" aria-modal="true" aria-labelledby="game-over-title">
+              <div class="overlay-card"><span class="overlay-stamp">本局结束</span><h2 id="game-over-title">猫猫堆太高啦！</h2><p>休息一下，再来挑战合成大耄耋。</p><div class="final-score">本局得分 <strong id="final-score">0</strong></div><button id="restart" class="primary-button">再玩一次 <span>↗</span></button></div>
+            </div>
+          </div>
+          <div class="board-footer"><span>小心不要超过虚线哦</span><span>玩的开心最重要 <b>♡</b></span></div>
+        </div>
+      </section>
+      <footer class="page-footer"><span>合成大耄耋 <span class="footer-separator">/</span> 休闲合成小游戏</span><span>每一只猫猫都值得被好好接住 <b>♥</b></span></footer>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
