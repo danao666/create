@@ -1,7 +1,8 @@
 import Matter from 'matter-js';
 import './style.css';
+import { PHYSICS, createPhysicsEngine, createPhysicsBall } from './physics.js';
 
-const { Engine, Bodies, Body, Composite, Events } = Matter;
+const { Engine, Bodies, Body, Composite, Events, Sleeping } = Matter;
 
 // Swap emoji/colors for the final illustration assets here.
 const CAT_STAGES = [
@@ -29,10 +30,7 @@ const BEST_KEY = 'hecheng-damaodie-best';
 
 const canvas = document.querySelector('#game');
 const ctx = canvas.getContext('2d');
-const engine = Engine.create({ enableSleeping: true });
-engine.gravity.y = 1.05;
-engine.positionIterations = 8;
-engine.velocityIterations = 6;
+const engine = createPhysicsEngine();
 
 const boundaries = [
   Bodies.rectangle(-WALL / 2, HEIGHT / 2, WALL, HEIGHT * 2, { isStatic: true, label: 'wall-left', friction: 0.08 }),
@@ -57,6 +55,7 @@ let mergeQueue = new Set();
 let dangerSince = new Map();
 let mergeFlash = [];
 let lastFrame = performance.now();
+let accumulatedTime = 0;
 let round = 1;
 
 function readBestScore() {
@@ -74,14 +73,9 @@ function stageOf(body) {
 
 function makeCat(x, y, stage, { isSensor = false } = {}) {
   const data = CAT_STAGES[stage];
-  const body = Bodies.circle(x, y, data.radius, {
+  const body = createPhysicsBall(x, y, data.radius, {
     label: 'cat',
     isSensor,
-    restitution: 0.08,
-    friction: 0.12,
-    frictionStatic: 0.25,
-    density: 0.0018,
-    sleepThreshold: 50,
   });
   body.plugin.stage = stage;
   body.plugin.merged = false;
@@ -104,15 +98,10 @@ function dropCat() {
   if (!canDrop || isGameOver) return;
   const radius = CAT_STAGES[activeStage].radius;
   const x = Math.max(WALL + radius, Math.min(WIDTH - WALL - radius, aimX));
-  const body = makeCat(x, PREVIEW_Y + radius, activeStage, { isSensor: true });
-  body.plugin.justDropped = true;
+  const body = makeCat(x, PREVIEW_Y + radius, activeStage);
   Composite.add(engine.world, body);
   canDrop = false;
   window.setTimeout(() => {
-    if (Composite.get(engine.world, body.id, 'body')) {
-      body.isSensor = false;
-      body.plugin.justDropped = false;
-    }
     addNextCat();
   }, 420);
 }
@@ -148,12 +137,27 @@ function resolveMerges() {
     const stage = bodyA.plugin.stage;
     const x = (bodyA.position.x + bodyB.position.x) / 2;
     const y = (bodyA.position.y + bodyB.position.y) / 2;
+    // Removing a supporting ball changes the stack; allow its neighbours to settle again.
+    for (const pair of engine.pairs.list) {
+      if (!pair.isActive) continue;
+      const affected = pair.bodyA === bodyA || pair.bodyA === bodyB
+        || pair.bodyB === bodyA || pair.bodyB === bodyB;
+      if (!affected) continue;
+      for (const neighbour of [pair.bodyA, pair.bodyB]) {
+        if (!neighbour.isStatic && neighbour !== bodyA && neighbour !== bodyB) {
+          Sleeping.set(neighbour, false);
+        }
+      }
+    }
     Composite.remove(engine.world, bodyA);
     Composite.remove(engine.world, bodyB);
     const upgraded = makeCat(x, y, stage + 1);
+    // Upgrading changes disk area as a gameplay rule; retain centre-of-mass
+    // velocity rather than injecting a new upward impulse.
+    const combinedMass = bodyA.mass + bodyB.mass;
     Body.setVelocity(upgraded, {
-      x: (bodyA.velocity.x + bodyB.velocity.x) / 2,
-      y: Math.min((bodyA.velocity.y + bodyB.velocity.y) / 2, -1.4),
+      x: (bodyA.mass * bodyA.velocity.x + bodyB.mass * bodyB.velocity.x) / combinedMass,
+      y: (bodyA.mass * bodyA.velocity.y + bodyB.mass * bodyB.velocity.y) / combinedMass,
     });
     Composite.add(engine.world, upgraded);
     mergeFlash.push({ x, y, born: performance.now(), color: CAT_STAGES[stage + 1].color });
@@ -282,10 +286,14 @@ function drawMerges(now) {
 }
 
 function render(now) {
-  const delta = Math.min(now - lastFrame, 32);
+  const delta = Math.min(now - lastFrame, 100);
   lastFrame = now;
-  Engine.update(engine, delta);
-  resolveMerges();
+  accumulatedTime += delta;
+  while (accumulatedTime >= PHYSICS.step) {
+    Engine.update(engine, PHYSICS.step);
+    resolveMerges();
+    accumulatedTime -= PHYSICS.step;
+  }
   updateDangerLine(now);
   drawBackground();
   drawAim();
