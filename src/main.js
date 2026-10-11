@@ -1,10 +1,11 @@
 import Matter from 'matter-js';
 import './style.css';
-import { PHYSICS, createPhysicsEngine, createPhysicsBall, pushMergeNeighbours } from './physics.js';
+import { PHYSICS, createPhysicsEngine, createPhysicsBall, createPhysicsPolygon, pushMergeNeighbours } from './physics.js';
+import shapes from './generated/cat-shapes.json';
 
 const { Engine, Bodies, Body, Composite, Events, Sleeping } = Matter;
 
-// Swap emoji/colors for the final illustration assets here.
+// Size and scoring progression. Missing images retain their emoji placeholder.
 const CAT_STAGES = [
   { radius: 18, emoji: '🐾', color: '#f7d5ab', points: 1 },
   { radius: 23, emoji: '🐈', color: '#f1c78e', points: 3 },
@@ -27,6 +28,15 @@ const DANGER_Y = 92;
 const PREVIEW_Y = 49;
 const TOP_STAGE = 4;
 const BEST_KEY = 'hecheng-damaodie-best';
+const stageImages = shapes.map(shape => {
+  if (!shape) return null;
+  const image = new Image();
+  image.src = `${import.meta.env.BASE_URL}images/${shape.file}`;
+  image.onload = () => {
+    if (shapes[nextStage] === shape) updateNextPreview();
+  };
+  return image;
+});
 
 const canvas = document.querySelector('#game');
 const ctx = canvas.getContext('2d');
@@ -73,10 +83,10 @@ function stageOf(body) {
 
 function makeCat(x, y, stage, { isSensor = false } = {}) {
   const data = CAT_STAGES[stage];
-  const body = createPhysicsBall(x, y, data.radius, {
-    label: 'cat',
-    isSensor,
-  });
+  const options = { label: 'cat', isSensor };
+  const body = shapes[stage]
+    ? createPhysicsPolygon(x, y, data.radius, shapes[stage].vertices, options)
+    : createPhysicsBall(x, y, data.radius, options);
   body.plugin.stage = stage;
   body.plugin.merged = false;
   return body;
@@ -85,19 +95,41 @@ function makeCat(x, y, stage, { isSensor = false } = {}) {
 function addNextCat() {
   activeStage = nextStage;
   nextStage = randomStage();
-  const radius = CAT_STAGES[activeStage].radius;
-  aimX = Math.max(WALL + radius, Math.min(WIDTH - WALL - radius, aimX));
+  aimX = clampAim(aimX, activeStage);
+  updateNextPreview();
+  canDrop = true;
+}
+
+function clampAim(x, stage) {
+  const radius = CAT_STAGES[stage].radius;
+  const draw = shapes[stage]?.draw ?? { x: -1, width: 2 };
+  return Math.max(WALL - draw.x * radius, Math.min(WIDTH - WALL - (draw.x + draw.width) * radius, x));
+}
+
+function updateNextPreview() {
   const preview = CAT_STAGES[nextStage];
-  nextPreview.textContent = preview.emoji;
+  const image = stageImages[nextStage], shape = shapes[nextStage];
+  if (shape && image?.complete && image.naturalWidth) {
+    const thumbnail = document.createElement('canvas');
+    thumbnail.width = thumbnail.height = 64;
+    thumbnail.style.width = thumbnail.style.height = '36px';
+    const { crop } = shape;
+    const scale = 60 / Math.max(crop.width, crop.height);
+    const width = crop.width * scale, height = crop.height * scale;
+    thumbnail.getContext('2d').drawImage(image, crop.x, crop.y, crop.width, crop.height,
+      (64 - width) / 2, (64 - height) / 2, width, height);
+    nextPreview.replaceChildren(thumbnail);
+  } else {
+    nextPreview.textContent = preview.emoji;
+  }
   nextPreview.style.background = preview.color;
   nextPreview.style.fontSize = `${Math.min(27, 15 + preview.radius / 6)}px`;
-  canDrop = true;
 }
 
 function dropCat() {
   if (!canDrop || isGameOver) return;
   const radius = CAT_STAGES[activeStage].radius;
-  const x = Math.max(WALL + radius, Math.min(WIDTH - WALL - radius, aimX));
+  const x = clampAim(aimX, activeStage);
   const body = makeCat(x, PREVIEW_Y + radius, activeStage);
   Body.setVelocity(body, { x: 0, y: PHYSICS.dropVelocity });
   Composite.add(engine.world, body);
@@ -118,7 +150,8 @@ function award(points) {
 }
 
 function onCollisionStart({ pairs }) {
-  for (const { bodyA, bodyB } of pairs) {
+  for (const pair of pairs) {
+    const bodyA = pair.bodyA.parent, bodyB = pair.bodyB.parent;
     if (bodyA.label !== 'cat' || bodyB.label !== 'cat') continue;
     const stageA = bodyA.plugin.stage;
     if (stageA !== bodyB.plugin.stage || stageA >= CAT_STAGES.length - 1) continue;
@@ -141,10 +174,11 @@ function resolveMerges() {
     // Removing a supporting ball changes the stack; allow its neighbours to settle again.
     for (const pair of engine.pairs.list) {
       if (!pair.isActive) continue;
-      const affected = pair.bodyA === bodyA || pair.bodyA === bodyB
-        || pair.bodyB === bodyA || pair.bodyB === bodyB;
+      const parentA = pair.bodyA.parent, parentB = pair.bodyB.parent;
+      const affected = parentA === bodyA || parentA === bodyB
+        || parentB === bodyA || parentB === bodyB;
       if (!affected) continue;
-      for (const neighbour of [pair.bodyA, pair.bodyB]) {
+      for (const neighbour of [parentA, parentB]) {
         if (!neighbour.isStatic && neighbour !== bodyA && neighbour !== bodyB) {
           Sleeping.set(neighbour, false);
         }
@@ -173,9 +207,9 @@ function updateDangerLine(now) {
   const present = new Set(currentCats.map((body) => body.id));
   for (const id of dangerSince.keys()) if (!present.has(id)) dangerSince.delete(id);
   for (const body of currentCats) {
-    const radius = stageOf(body).radius;
-    const aboveLine = body.position.y - radius < DANGER_Y;
-    const almostSettled = Math.abs(body.velocity.x) < 0.35 && Math.abs(body.velocity.y) < 0.45;
+    const aboveLine = body.bounds.min.y < DANGER_Y;
+    const almostSettled = Math.abs(body.velocity.x) < 0.35 && Math.abs(body.velocity.y) < 0.45
+      && Math.abs(body.angularVelocity) < 0.02;
     if (!aboveLine || !almostSettled) {
       dangerSince.delete(body.id);
       continue;
@@ -228,6 +262,15 @@ function drawCat(body) {
   const { x, y } = body.position;
   ctx.save();
   ctx.translate(x, y);
+  ctx.rotate(body.angle ?? 0);
+  const shape = shapes[body.plugin.stage], image = stageImages[body.plugin.stage];
+  if (shape && image?.complete && image.naturalWidth) {
+    const { crop, draw } = shape;
+    ctx.drawImage(image, crop.x, crop.y, crop.width, crop.height,
+      draw.x * radius, draw.y * radius, draw.width * radius, draw.height * radius);
+    ctx.restore();
+    return;
+  }
   const gradient = ctx.createRadialGradient(-radius * .32, -radius * .38, radius * .08, 0, 0, radius * 1.12);
   gradient.addColorStop(0, '#ffffff');
   gradient.addColorStop(.34, color);
@@ -253,7 +296,7 @@ function drawCat(body) {
 function drawAim() {
   if (!canDrop || isGameOver || activeStage === null) return;
   const radius = CAT_STAGES[activeStage].radius;
-  const x = Math.max(WALL + radius, Math.min(WIDTH - WALL - radius, aimX));
+  const x = clampAim(aimX, activeStage);
   ctx.save();
   ctx.setLineDash([3, 5]);
   ctx.strokeStyle = '#d6aa88a0';
@@ -324,7 +367,7 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'ArrowLeft' || event.code === 'KeyA') aimX -= 24;
   if (event.code === 'ArrowRight' || event.code === 'KeyD') aimX += 24;
   if (event.code === 'Space' || event.code === 'ArrowDown' || event.code === 'Enter') dropCat();
-  aimX = Math.max(WALL + 14, Math.min(WIDTH - WALL - 14, aimX));
+  aimX = clampAim(aimX, activeStage ?? 0);
 });
 
 document.querySelector('#restart').addEventListener('click', () => {

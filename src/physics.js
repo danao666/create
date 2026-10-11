@@ -1,6 +1,8 @@
 import Matter from 'matter-js';
+import decomp from 'poly-decomp';
 
 const { Engine, Bodies, Body, Composite, Events, Sleeping } = Matter;
+Matter.Common.setDecomp(decomp);
 
 export const PHYSICS = Object.freeze({
   step: 1000 / 120,
@@ -34,7 +36,9 @@ export function createPhysicsEngine() {
   });
   Events.on(engine, 'collisionStart', ({ pairs }) => {
     for (const pair of pairs) {
-      const { bodyA, bodyB, normal } = pair.collision;
+      const { normal } = pair.collision;
+      const bodyA = pair.collision.bodyA.parent;
+      const bodyB = pair.collision.bodyB.parent;
       const velocityA = Body.getVelocity(bodyA);
       const velocityB = Body.getVelocity(bodyB);
       const normalSpeed = Math.abs(
@@ -70,9 +74,39 @@ export function createPhysicsBall(x, y, radius, options = {}) {
   return body;
 }
 
+export function createPhysicsPolygon(x, y, radius, outline, options = {}) {
+  const vertices = outline.map(p => ({ x: p.x * radius, y: p.y * radius }));
+  const body = Bodies.fromVertices(x, y, vertices, {
+    restitution: PHYSICS.restitution,
+    friction: 0.18,
+    frictionStatic: 0.6,
+    frictionAir: PHYSICS.frictionAir,
+    sleepThreshold: PHYSICS.sleepThreshold,
+    ...options,
+  }, true, false, 0, false);
+  if (!body) throw new Error('Could not create silhouette collision body');
+  const equivalentRadius = Math.sqrt(body.area / Math.PI);
+  const reference = PHYSICS.massReferenceRadius;
+  const mass = PHYSICS.surfaceDensity * Math.PI * reference ** 2
+    * (equivalentRadius / reference) ** PHYSICS.massExponent;
+  Body.setMass(body, mass);
+  // True polygon inertia about its centroid, including the compound parts' offsets.
+  let crossSum = 0, momentSum = 0;
+  for (let i = 0; i < vertices.length; i++) {
+    const a = vertices[i], b = vertices[(i + 1) % vertices.length];
+    const cross = a.x * b.y - b.x * a.y;
+    crossSum += cross;
+    momentSum += cross * (a.x * a.x + a.x * b.x + b.x * b.x
+      + a.y * a.y + a.y * b.y + b.y * b.y);
+  }
+  Body.setInertia(body, mass * momentSum / (6 * crossSum));
+  body.plugin.sizeRadius = radius;
+  return body;
+}
+
 // A one-shot gameplay impulse, separate from ordinary collision restitution.
 export function pushMergeNeighbours(engine, mergedBall) {
-  const radius = mergedBall.circleRadius;
+  const radius = mergedBall.plugin.sizeRadius ?? mergedBall.circleRadius;
   const reach = Math.max(120, Math.min(220, radius * 2));
   const strength = Math.min(PHYSICS.mergeMaxKick, 9 + radius * 0.06);
   for (const body of Composite.allBodies(engine.world)) {
@@ -81,7 +115,8 @@ export function pushMergeNeighbours(engine, mergedBall) {
     const dx = body.position.x - mergedBall.position.x;
     const dy = body.position.y - mergedBall.position.y;
     const distance = Math.hypot(dx, dy);
-    const gap = Math.max(0, distance - radius - body.circleRadius);
+    const neighbourRadius = body.plugin.sizeRadius ?? body.circleRadius;
+    const gap = Math.max(0, distance - radius - neighbourRadius);
     if (gap >= reach) continue;
     // Degenerate overlaps still get a finite, deterministic outward direction.
     const angle = body.id * 2.399963229728653;
