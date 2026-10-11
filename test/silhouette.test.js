@@ -2,14 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import Matter from 'matter-js';
+import { CAT_STAGES } from '../src/stages.js';
 import { PHYSICS, createPhysicsEngine, createPhysicsPolygon, pushMergeNeighbours } from '../src/physics.js';
 
 const shapes = JSON.parse(readFileSync(new URL('../src/generated/cat-shapes.json', import.meta.url)));
-const radii = [18, 23, 29, 36, 44, 53, 63, 74, 86, 99, 113];
+const radii = CAT_STAGES.map(stage => stage.radius);
 const { Composite, Bodies, Engine, Vertices, Sleeping } = Matter;
 
 test('uploaded silhouettes have matching visual bounds and area; missing images retain fallback metadata', () => {
-  assert.equal(shapes.length, 11);
+  assert.equal(shapes.length, CAT_STAGES.length);
   for (let i = 0; i < shapes.length; i++) {
     const file = `cat-${String(i + 1).padStart(2, '0')}.png`;
     assert.equal(shapes[i] !== null, existsSync(new URL(`../public/images/${file}`, import.meta.url)));

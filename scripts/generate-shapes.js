@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 import decomp from 'poly-decomp';
 import Matter from 'matter-js';
+import { CAT_STAGES } from '../src/stages.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const resolution = 192;
@@ -131,7 +132,7 @@ function silhouette(png) {
 }
 
 const shapes = [];
-for (let stage = 1; stage <= 11; stage++) {
+for (let stage = 1; stage <= CAT_STAGES.length; stage++) {
   const file = `cat-${String(stage).padStart(2, '0')}.png`;
   let buffer;
   try { buffer = await readFile(`${root}public/images/${file}`); }

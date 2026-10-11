@@ -27,11 +27,11 @@ Vite 会在终端显示本地开发地址。生产构建使用 `npm run build`�
 
 运行 `npm test` 检查质量、动量、弹跳、碰壁衰减、静止稳定性和合成冲量。
 
-物理模拟使用 Matter.js，凹轮廓由 poly-decomp 拆分为凸多边形组成的刚体。合成等级、尺寸和缺失贴图时的占位外观在 `src/main.js` 的 `CAT_STAGES` 中。界面和画布样式在 `src/style.css`。
+物理模拟使用 Matter.js，凹轮廓由 poly-decomp 拆分为凸多边形组成的刚体。合成等级、尺寸和缺失贴图时的占位外观在 `src/stages.js` 的 `CAT_STAGES` 中。界面和画布样式在 `src/style.css`。
 
 ## 贴图与轮廓
 
-透明 PNG 放在 `public/images/`，按 `cat-01.png` 到 `cat-11.png` 命名。目前已接入前 10 张，第 11 级使用圆形 emoji 占位；上传第 11 张后，下次构建会自动接入。
+透明 PNG 放在 `public/images/`，按 `cat-01.png` 到 `cat-12.png` 命名。目前 12 个等级都已接入贴图，文件编号与等级一一对应。第 12 级的尺寸为半径 129 像素、最长边 258 像素，由两个第 11 级合成，合成得分为 90。缺失某张图片时仍使用圆形 emoji 占位。等级配置同时驱动贴图生成和物理测试，增加等级时不必另改提取脚本。
 
 启动开发服务、运行测试或生产构建时，`scripts/generate-shapes.js` 自动读取 PNG 的透明度并生成 `src/generated/cat-shapes.json`。也可手动执行 `npm run assets`。图片会去掉透明留白，主体最长边按原来的等级直径缩放，渲染和碰撞共用相同的缩放、质心偏移和旋转角度。
 
