@@ -1,6 +1,6 @@
 import Matter from 'matter-js';
 import './style.css';
-import { PHYSICS, createPhysicsEngine, createPhysicsBall } from './physics.js';
+import { PHYSICS, createPhysicsEngine, createPhysicsBall, pushMergeNeighbours } from './physics.js';
 
 const { Engine, Bodies, Body, Composite, Events, Sleeping } = Matter;
 
@@ -161,6 +161,7 @@ function resolveMerges() {
       y: (bodyA.mass * bodyA.velocity.y + bodyB.mass * bodyB.velocity.y) / combinedMass,
     });
     Composite.add(engine.world, upgraded);
+    pushMergeNeighbours(engine, upgraded);
     mergeFlash.push({ x, y, born: performance.now(), color: CAT_STAGES[stage + 1].color });
     award(CAT_STAGES[stage + 1].points);
   }
