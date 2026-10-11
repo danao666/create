@@ -14,8 +14,8 @@ export const PHYSICS = Object.freeze({
   bounceThreshold: 0.8, // Matter velocities are pixels per nominal 60 Hz frame.
   frictionAir: 0.004,
   sleepThreshold: 90,
-  mergeMaxKick: 5.2,
-  mergeMaxOutwardSpeed: 7,
+  mergeMaxKick: 14,
+  mergeMaxOutwardSpeed: 18,
 });
 
 export function createPhysicsEngine() {
@@ -73,8 +73,8 @@ export function createPhysicsBall(x, y, radius, options = {}) {
 // A one-shot gameplay impulse, separate from ordinary collision restitution.
 export function pushMergeNeighbours(engine, mergedBall) {
   const radius = mergedBall.circleRadius;
-  const reach = Math.max(60, Math.min(120, radius * 1.4));
-  const strength = Math.min(PHYSICS.mergeMaxKick, 2.7 + radius * 0.024);
+  const reach = Math.max(120, Math.min(220, radius * 2));
+  const strength = Math.min(PHYSICS.mergeMaxKick, 9 + radius * 0.06);
   for (const body of Composite.allBodies(engine.world)) {
     if (body === mergedBall || body.isStatic || body.isSensor
       || body.label !== 'cat' || body.plugin.merged) continue;
@@ -87,12 +87,12 @@ export function pushMergeNeighbours(engine, mergedBall) {
     const angle = body.id * 2.399963229728653;
     const nx = distance > 0.001 ? dx / distance : Math.cos(angle);
     const ny = distance > 0.001 ? dy / distance : Math.sin(angle);
-    const massFactor = Math.max(0.65, Math.min(1.35, Math.sqrt(mergedBall.mass / body.mass)));
+    const massFactor = Math.max(0.9, Math.min(1.25, Math.sqrt(mergedBall.mass / body.mass)));
     const velocity = Body.getVelocity(body);
     const outwardSpeed = velocity.x * nx + velocity.y * ny;
     const kick = Math.min(
       PHYSICS.mergeMaxKick,
-      strength * massFactor * (1 - gap / reach) ** 2,
+      strength * massFactor * (1 - gap / reach) ** 1.2,
       Math.max(0, PHYSICS.mergeMaxOutwardSpeed - outwardSpeed),
     );
     // Do not wake resting balls at the edge with negligible impulses.

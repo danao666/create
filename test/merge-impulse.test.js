@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import Matter from 'matter-js';
 import { PHYSICS, createPhysicsEngine, createPhysicsBall, pushMergeNeighbours } from '../src/physics.js';
 
-const { Body, Composite, Sleeping } = Matter;
+const { Body, Composite, Sleeping, Bodies, Engine } = Matter;
 const ball = (x, y, radius = 20) => createPhysicsBall(x, y, radius, { label: 'cat' });
 
 test('merging pushes nearby balls radially with distance falloff and wakes them', () => {
@@ -19,7 +19,7 @@ test('merging pushes nearby balls radially with distance falloff and wakes them'
   for (const body of [right, left, above, below, farther, distant]) Sleeping.set(body, true);
   pushMergeNeighbours(engine, merged);
   assert.ok(right.velocity.x > 0 && left.velocity.x < 0);
-  assert.ok(right.velocity.x > 4.5, 'nearby balls receive a stronger merge kick');
+  assert.ok(right.velocity.x > 12, 'nearby balls receive a dramatic merge kick');
   assert.ok(above.velocity.y < 0 && below.velocity.y > 0);
   assert.ok(farther.velocity.x > 0 && farther.velocity.x < right.velocity.x);
   assert.ok(!right.isSleeping && distant.isSleeping);
@@ -38,9 +38,40 @@ test('larger neighbours get smaller kicks and repeated merges limit outward spee
   assert.ok(small.speed <= PHYSICS.mergeMaxKick);
   for (let i = 0; i < 10; i++) pushMergeNeighbours(engine, merged);
   assert.ok(small.velocity.x <= PHYSICS.mergeMaxOutwardSpeed + 1e-10);
-  Body.setVelocity(small, { x: 10, y: 0 });
+  Body.setVelocity(small, { x: 25, y: 0 });
   pushMergeNeighbours(engine, merged);
-  assert.equal(small.velocity.x, 10, 'existing fast outward motion is not artificially slowed');
+  assert.equal(small.velocity.x, 25, 'existing fast outward motion is not artificially slowed');
+});
+
+test('strong merge impulses reverse incoming motion and also displace large and farther balls', () => {
+  const engine = createPhysicsEngine();
+  const merged = ball(200, 200, 40);
+  const incoming = ball(260, 200);
+  const large = ball(74, 200, 86);
+  const farther = ball(360, 200);
+  Composite.add(engine.world, [merged, incoming, large, farther]);
+  Body.setVelocity(incoming, { x: -8, y: 0 });
+  Sleeping.set(large, true);
+  Sleeping.set(farther, true);
+  pushMergeNeighbours(engine, merged);
+  assert.ok(incoming.velocity.x > 4, 'incoming ball should reverse outward');
+  assert.ok(large.velocity.x < -9 && !large.isSleeping, 'large balls should move significantly');
+  assert.ok(farther.velocity.x > 1 && !farther.isSleeping, 'expanded range affects farther balls');
+});
+
+test('a strongly launched neighbour still falls back and comes to rest', () => {
+  const engine = createPhysicsEngine();
+  const merged = ball(200, 240, 40);
+  const neighbour = ball(200, 180);
+  Composite.add(engine.world, [neighbour,
+    Bodies.rectangle(200, 408, 600, 16, { isStatic: true, label: 'floor' }),
+  ]);
+  Sleeping.set(neighbour, true);
+  pushMergeNeighbours(engine, merged);
+  assert.ok(neighbour.velocity.y < -12);
+  for (let i = 0; i < 30 * 1000 / PHYSICS.step; i++) Engine.update(engine, PHYSICS.step);
+  assert.ok(neighbour.isSleeping);
+  assert.ok(neighbour.position.y > 375 && neighbour.position.y < 383);
 });
 
 test('overlapping centres stay finite; walls and balls pending another merge are untouched', () => {
