@@ -5,10 +5,13 @@ const { Engine, Bodies, Body, Composite, Events } = Matter;
 export const PHYSICS = Object.freeze({
   step: 1000 / 120,
   surfaceDensity: 0.0018,
-  restitution: 0.58,
-  wallRestitution: 0.4,
+  massReferenceRadius: 18,
+  massExponent: 1.2,
+  dropVelocity: 6,
+  restitution: 0.92,
+  wallRestitution: 0.84,
   bounceThreshold: 0.8, // Matter velocities are pixels per nominal 60 Hz frame.
-  frictionAir: 0.012,
+  frictionAir: 0.004,
   sleepThreshold: 90,
 });
 
@@ -52,8 +55,11 @@ export function createPhysicsBall(x, y, radius, options = {}) {
     sleepThreshold: PHYSICS.sleepThreshold,
     ...options,
   }, 64);
-  // Matter approximates circles with polygons; use the actual disk area and inertia.
-  const mass = PHYSICS.surfaceDensity * Math.PI * radius ** 2;
+  // Keep the smallest disk's mass, but compress the mass range for stronger
+  // small-to-large impacts. Effective area density now decreases with size.
+  const reference = PHYSICS.massReferenceRadius;
+  const mass = PHYSICS.surfaceDensity * Math.PI * reference ** 2
+    * (radius / reference) ** PHYSICS.massExponent;
   Body.setMass(body, mass);
   Body.setInertia(body, mass * radius ** 2 / 2);
   return body;

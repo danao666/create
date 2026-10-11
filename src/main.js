@@ -99,6 +99,7 @@ function dropCat() {
   const radius = CAT_STAGES[activeStage].radius;
   const x = Math.max(WALL + radius, Math.min(WIDTH - WALL - radius, aimX));
   const body = makeCat(x, PREVIEW_Y + radius, activeStage);
+  Body.setVelocity(body, { x: 0, y: PHYSICS.dropVelocity });
   Composite.add(engine.world, body);
   canDrop = false;
   window.setTimeout(() => {

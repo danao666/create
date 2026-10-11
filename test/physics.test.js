@@ -11,12 +11,23 @@ function floor(engine) {
   Composite.add(engine.world, Bodies.rectangle(200, 408, 600, 16, { isStatic: true }));
 }
 
-test('equal area density gives a fourfold mass for twice the radius', () => {
+test('mass range is compressed while retaining disk inertia', () => {
   const small = createPhysicsBall(0, 0, 20);
   const large = createPhysicsBall(0, 0, 40);
-  assert.equal(large.mass / small.mass, 4);
-  assert.equal(small.mass, PHYSICS.surfaceDensity * Math.PI * 20 ** 2);
+  assert.ok(Math.abs(large.mass / small.mass - 2 ** 1.2) < 1e-10);
+  assert.ok(large.mass / small.mass < 4);
   assert.equal(small.inertia, small.mass * 20 ** 2 / 2);
+});
+
+test('a small ball noticeably accelerates a much larger ball', () => {
+  const engine = createPhysicsEngine();
+  engine.gravity.y = 0;
+  const small = createPhysicsBall(100, 100, 18, { frictionAir: 0, friction: 0 });
+  const large = createPhysicsBall(208, 100, 86, { frictionAir: 0, friction: 0 });
+  Composite.add(engine.world, [small, large]);
+  Body.setVelocity(small, { x: 8, y: 0 });
+  advance(engine, 0.15);
+  assert.ok(large.velocity.x > 1.5, 'large ball should receive a visible impulse');
 });
 
 test('unequal balls conserve linear momentum and dissipate collision energy', () => {
@@ -39,11 +50,17 @@ test('a falling ball bounces, loses height and eventually sleeps', () => {
   const engine = createPhysicsEngine();
   floor(engine);
   const ball = createPhysicsBall(200, 80, 20);
+  Body.setVelocity(ball, { x: 0, y: PHYSICS.dropVelocity });
   Composite.add(engine.world, ball);
   let bounced = false;
-  Events.on(engine, 'afterUpdate', () => { if (ball.velocity.y < -1) bounced = true; });
-  advance(engine, 12);
+  let highestRebound = 400;
+  Events.on(engine, 'afterUpdate', () => {
+    if (ball.velocity.y < -1) bounced = true;
+    if (bounced) highestRebound = Math.min(highestRebound, ball.position.y);
+  });
+  advance(engine, 20);
   assert.ok(bounced);
+  assert.ok(highestRebound < 230, 'first rebound should travel over 150 pixels');
   assert.ok(ball.position.y > 375 && ball.position.y < 383);
   assert.ok(ball.isSleeping);
   const position = { ...ball.position };
