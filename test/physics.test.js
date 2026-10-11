@@ -8,7 +8,7 @@ function advance(engine, seconds) {
   for (let i = 0; i < seconds * 1000 / PHYSICS.step; i++) Engine.update(engine, PHYSICS.step);
 }
 function floor(engine) {
-  Composite.add(engine.world, Bodies.rectangle(200, 408, 600, 16, { isStatic: true }));
+  Composite.add(engine.world, Bodies.rectangle(200, 408, 600, 16, { isStatic: true, label: 'floor' }));
 }
 
 test('mass range is compressed while retaining disk inertia', () => {
@@ -60,7 +60,7 @@ test('a falling ball bounces, loses height and eventually sleeps', () => {
   });
   advance(engine, 20);
   assert.ok(bounced);
-  assert.ok(highestRebound < 230, 'first rebound should travel over 150 pixels');
+  assert.ok(highestRebound < 290, 'floor should still allow a visible rebound over 90 pixels');
   assert.ok(ball.position.y > 375 && ball.position.y < 383);
   assert.ok(ball.isSleeping);
   const position = { ...ball.position };
@@ -77,6 +77,22 @@ test('wall impact reverses normal velocity with decay', () => {
   advance(engine, 0.1);
   assert.ok(ball.velocity.x < 0);
   assert.ok(Math.abs(ball.velocity.x) < 8);
+});
+
+test('floor rebounds are weaker than wall rebounds for the same impact', () => {
+  function rebound(label) {
+    const engine = createPhysicsEngine();
+    engine.gravity.y = 0;
+    const ball = createPhysicsBall(100, 100, 20, { frictionAir: 0 });
+    Composite.add(engine.world, [ball, Bodies.rectangle(100, 150, 400, 16, { isStatic: true, label })]);
+    Body.setVelocity(ball, { x: 0, y: 8 });
+    advance(engine, 0.1);
+    assert.ok(ball.velocity.y < 0);
+    return Math.abs(ball.velocity.y);
+  }
+  const floorSpeed = rebound('floor');
+  const wallSpeed = rebound('wall');
+  assert.ok(floorSpeed < wallSpeed * 0.9, 'floor should dissipate more energy than walls');
 });
 
 test('settled stacks stay still under tiny contacts but wake for direct impacts', () => {

@@ -10,11 +10,12 @@ export const PHYSICS = Object.freeze({
   dropVelocity: 6,
   restitution: 0.92,
   wallRestitution: 0.84,
+  floorRestitution: 0.68,
   bounceThreshold: 0.8, // Matter velocities are pixels per nominal 60 Hz frame.
   frictionAir: 0.004,
   sleepThreshold: 90,
-  mergeMaxKick: 3.8,
-  mergeMaxOutwardSpeed: 5,
+  mergeMaxKick: 5.2,
+  mergeMaxOutwardSpeed: 7,
 });
 
 export function createPhysicsEngine() {
@@ -41,7 +42,9 @@ export function createPhysicsEngine() {
         + (velocityA.y - velocityB.y) * normal.y,
       );
       pair.restitution = normalSpeed < PHYSICS.bounceThreshold ? 0
-        : bodyA.isStatic || bodyB.isStatic ? PHYSICS.wallRestitution
+        : (bodyA.isStatic && bodyA.label === 'floor') || (bodyB.isStatic && bodyB.label === 'floor')
+          ? PHYSICS.floorRestitution
+          : bodyA.isStatic || bodyB.isStatic ? PHYSICS.wallRestitution
           : PHYSICS.restitution;
     }
   });
@@ -71,7 +74,7 @@ export function createPhysicsBall(x, y, radius, options = {}) {
 export function pushMergeNeighbours(engine, mergedBall) {
   const radius = mergedBall.circleRadius;
   const reach = Math.max(60, Math.min(120, radius * 1.4));
-  const strength = Math.min(PHYSICS.mergeMaxKick, 2 + radius * 0.018);
+  const strength = Math.min(PHYSICS.mergeMaxKick, 2.7 + radius * 0.024);
   for (const body of Composite.allBodies(engine.world)) {
     if (body === mergedBall || body.isStatic || body.isSensor
       || body.label !== 'cat' || body.plugin.merged) continue;

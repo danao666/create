@@ -19,6 +19,7 @@ test('merging pushes nearby balls radially with distance falloff and wakes them'
   for (const body of [right, left, above, below, farther, distant]) Sleeping.set(body, true);
   pushMergeNeighbours(engine, merged);
   assert.ok(right.velocity.x > 0 && left.velocity.x < 0);
+  assert.ok(right.velocity.x > 4.5, 'nearby balls receive a stronger merge kick');
   assert.ok(above.velocity.y < 0 && below.velocity.y > 0);
   assert.ok(farther.velocity.x > 0 && farther.velocity.x < right.velocity.x);
   assert.ok(!right.isSleeping && distant.isSleeping);
