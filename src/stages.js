@@ -8,8 +8,8 @@ export const CAT_STAGES = [
   { radius: 57, emoji: '😻', color: '#f2a8a0', points: 21 },
   { radius: 63, emoji: '🙀', color: '#b9d7c5', points: 28 },
   { radius: 74, emoji: '😽', color: '#efc0cf', points: 36 },
-  { radius: 86, emoji: '😹', color: '#b8cae6', points: 45 },
-  { radius: 99, emoji: '😼', color: '#e9b676', points: 55 },
+  { radius: 90, emoji: '😹', color: '#b8cae6', points: 45 },
+  { radius: 98, emoji: '😼', color: '#e9b676', points: 55 },
   { radius: 113, emoji: '😿', color: '#d9c4b1', points: 70 },
   { radius: 129, emoji: '👑', color: '#f0c96c', points: 90 },
 ];
