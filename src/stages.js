@@ -5,7 +5,7 @@ export const CAT_STAGES = [
   { radius: 27, emoji: '🐈‍⬛', color: '#d6c4e4', points: 6 },
   { radius: 40, emoji: '😺', color: '#f4c7a3', points: 10 },
   { radius: 44, emoji: '😸', color: '#f5d583', points: 15 },
-  { radius: 53, emoji: '😻', color: '#f2a8a0', points: 21 },
+  { radius: 57, emoji: '😻', color: '#f2a8a0', points: 21 },
   { radius: 63, emoji: '🙀', color: '#b9d7c5', points: 28 },
   { radius: 74, emoji: '😽', color: '#efc0cf', points: 36 },
   { radius: 86, emoji: '😹', color: '#b8cae6', points: 45 },
