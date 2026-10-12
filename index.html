@@ -25,6 +25,7 @@
             <span class="score-divider"></span>
             <div class="score-item"><span class="score-label">历史最高</span><strong id="best-score">0</strong></div>
           </div>
+          <div class="reward-inventory" id="reward-inventory">🎟 复活卡 <strong id="revive-count">0</strong><span>2000 / 4000 / 6000 分各获一张</span></div>
           <div class="next-card"><span class="next-label">下一只耄耋</span><div class="next-preview" id="next-preview" aria-label="下一只猫咪"></div><span class="next-hint">提前想好放哪儿哦</span></div>
           <div class="how-to-play"><span class="how-icon">✳</span><div><strong>怎么玩</strong><p>移动鼠标瞄准，点击投放<br />也可以用 ← → 移动，空格投放</p></div></div>
         </div>
@@ -32,9 +33,12 @@
         <div class="board-wrap">
           <div class="board-topline"><span><i class="live-dot"></i> 猫猫实验进行中</span><span>№ <span id="round-number">001</span></span></div>
           <div class="board-frame">
-            <canvas id="game" width="420" height="620" aria-label="游戏区域。移动鼠标或按方向键瞄准，点击或按空格投放。"></canvas>
+            <canvas id="game" width="420" height="620" tabindex="0" aria-label="游戏区域。移动鼠标或按方向键瞄准，点击或按空格投放。"></canvas>
             <div class="overlay hidden" id="game-over" role="dialog" aria-modal="true" aria-labelledby="game-over-title">
-              <div class="overlay-card"><span class="overlay-stamp">本局结束</span><h2 id="game-over-title">猫猫堆太高啦！</h2><p>休息一下，再来挑战合成大耄耋。</p><div class="final-score">本局得分 <strong id="final-score">0</strong></div><button id="restart" class="primary-button">再玩一次 <span>↗</span></button></div>
+              <div class="overlay-card"><span class="overlay-stamp">本局结束</span><h2 id="game-over-title">猫猫堆太高啦！</h2><p>休息一下，再来挑战合成大耄耋。</p><div class="final-score">本局得分 <strong id="final-score">0</strong></div><button id="revive" class="primary-button hidden">使用复活卡继续</button><p id="revive-hint" class="hidden">清理顶部危险区，保留本局得分</p><button id="restart" class="primary-button">再玩一次 <span>↗</span></button></div>
+            </div>
+            <div class="overlay hidden victory-overlay" id="victory" role="dialog" aria-modal="true" aria-labelledby="victory-title">
+              <div class="overlay-card"><span class="overlay-stamp">挑战成功 · 第 12 级</span><canvas id="victory-cat" width="144" height="144" aria-hidden="true"></canvas><h2 id="victory-title">哈基仙恭喜通关</h2><p>终于合出了传说中的哈基仙！</p><div class="final-score">通关得分 <strong id="victory-score">0</strong></div><button id="victory-restart" class="primary-button">再挑战一次 <span>↗</span></button></div>
             </div>
           </div>
           <div class="board-footer"><span>小心不要超过虚线哦</span><span>玩的开心最重要 <b>♡</b></span></div>
@@ -42,6 +46,8 @@
       </section>
       <footer class="page-footer"><span>合成大耄耋 <span class="footer-separator">/</span> 休闲合成小游戏</span><span>每一只猫猫都值得被好好接住 <b>♥</b></span></footer>
     </main>
+    <div id="reward-barrage" aria-live="polite" aria-atomic="false"></div>
+    <canvas id="celebration" aria-hidden="true" hidden></canvas>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

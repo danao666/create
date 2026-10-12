@@ -3,6 +3,8 @@ import './style.css';
 import { PHYSICS, createPhysicsEngine, createPhysicsBall, createPhysicsPolygon, pushMergeNeighbours } from './physics.js';
 import shapes from './generated/cat-shapes.json';
 import { CAT_STAGES } from './stages.js';
+import { createRewards, grantRewards, consumeReviveCard } from './rewards.js';
+import { createCelebration } from './celebration.js';
 
 const { Engine, Bodies, Body, Composite, Events, Sleeping } = Matter;
 
@@ -40,6 +42,13 @@ const bestElement = document.querySelector('#best-score');
 const nextPreview = document.querySelector('#next-preview');
 const roundElement = document.querySelector('#round-number');
 const gameOverOverlay = document.querySelector('#game-over');
+const victoryOverlay = document.querySelector('#victory');
+const reviveButton = document.querySelector('#revive');
+const reviveHint = document.querySelector('#revive-hint');
+const celebration = createCelebration(document.querySelector('#celebration'));
+let rewards = createRewards();
+let hasWon = false;
+let dropTimeout = null;
 let score = 0;
 let bestScore = readBestScore();
 let nextStage = randomStage();
@@ -79,6 +88,7 @@ function makeCat(x, y, stage, { isSensor = false } = {}) {
 }
 
 function addNextCat() {
+  if (isGameOver) return;
   activeStage = nextStage;
   nextStage = randomStage();
   aimX = clampAim(aimX, activeStage);
@@ -120,7 +130,8 @@ function dropCat() {
   Body.setVelocity(body, { x: 0, y: PHYSICS.dropVelocity });
   Composite.add(engine.world, body);
   canDrop = false;
-  window.setTimeout(() => {
+  dropTimeout = window.setTimeout(() => {
+    dropTimeout = null;
     addNextCat();
   }, 420);
 }
@@ -128,11 +139,32 @@ function dropCat() {
 function award(points) {
   score += points;
   scoreElement.textContent = score.toLocaleString('zh-CN');
+  const earned = grantRewards(rewards, score);
+  updateReviveInventory();
+  earned.forEach((milestone, lane) => {
+    announce(`🎟 达到 ${milestone.toLocaleString('zh-CN')} 分！获得一张复活卡`, lane);
+  });
   if (score > bestScore) {
     bestScore = score;
     bestElement.textContent = bestScore.toLocaleString('zh-CN');
     try { localStorage.setItem(BEST_KEY, String(bestScore)); } catch { /* storage may be disabled */ }
   }
+}
+
+function updateReviveInventory() {
+  document.querySelector('#revive-count').textContent = String(rewards.cards);
+  reviveButton.textContent = `使用复活卡继续（剩余 ${rewards.cards} 张）`;
+  reviveButton.classList.toggle('hidden', rewards.cards === 0);
+  reviveHint.classList.toggle('hidden', rewards.cards === 0);
+}
+
+function announce(message, lane = 0) {
+  const notice = document.createElement('div');
+  notice.className = 'reward-danmaku';
+  notice.textContent = message;
+  notice.style.top = `${64 + lane * 42}px`;
+  notice.addEventListener('animationend', () => notice.remove(), { once: true });
+  document.querySelector('#reward-barrage').append(notice);
 }
 
 function onCollisionStart({ pairs }) {
@@ -151,6 +183,7 @@ function onCollisionStart({ pairs }) {
 Events.on(engine, 'collisionStart', onCollisionStart);
 
 function resolveMerges() {
+  if (isGameOver) { mergeQueue.clear(); return; }
   if (!mergeQueue.size) return;
   for (const { bodyA, bodyB } of mergeQueue) {
     if (!Composite.get(engine.world, bodyA.id, 'body') || !Composite.get(engine.world, bodyB.id, 'body')) continue;
@@ -184,11 +217,13 @@ function resolveMerges() {
     pushMergeNeighbours(engine, upgraded);
     mergeFlash.push({ x, y, born: performance.now(), color: CAT_STAGES[stage + 1].color });
     award(CAT_STAGES[stage + 1].points);
+    if (stage + 1 === CAT_STAGES.length - 1) { winGame(); break; }
   }
   mergeQueue.clear();
 }
 
 function updateDangerLine(now) {
+  if (isGameOver) return;
   const currentCats = Composite.allBodies(engine.world).filter((body) => body.label === 'cat' && !body.isSensor);
   const present = new Set(currentCats.map((body) => body.id));
   for (const id of dangerSince.keys()) if (!present.has(id)) dangerSince.delete(id);
@@ -209,8 +244,51 @@ function updateDangerLine(now) {
 function endGame() {
   if (isGameOver) return;
   isGameOver = true;
+  clearTimeout(dropTimeout);
+  canDrop = false;
+  updateReviveInventory();
   document.querySelector('#final-score').textContent = score.toLocaleString('zh-CN');
   gameOverOverlay.classList.remove('hidden');
+  (rewards.cards ? reviveButton : document.querySelector('#restart')).focus();
+}
+
+function winGame() {
+  if (isGameOver) return;
+  hasWon = true;
+  isGameOver = true;
+  canDrop = false;
+  clearTimeout(dropTimeout);
+  document.querySelector('#victory-score').textContent = score.toLocaleString('zh-CN');
+  const image = stageImages.at(-1), shape = shapes.at(-1);
+  const portrait = document.querySelector('#victory-cat');
+  const portraitCtx = portrait.getContext('2d');
+  portraitCtx.clearRect(0, 0, 144, 144);
+  if (shape && image?.complete && image.naturalWidth) {
+    const { crop } = shape, scale = 136 / Math.max(crop.width, crop.height);
+    const w = crop.width * scale, h = crop.height * scale;
+    portraitCtx.drawImage(image, crop.x, crop.y, crop.width, crop.height, (144 - w) / 2, (144 - h) / 2, w, h);
+  }
+  victoryOverlay.classList.remove('hidden');
+  document.querySelector('#victory-restart').focus();
+  celebration.start();
+}
+
+function reviveGame() {
+  if (!isGameOver || hasWon || !consumeReviveCard(rewards)) return;
+  clearTimeout(dropTimeout);
+  for (const body of Composite.allBodies(engine.world)) {
+    if (body.label !== 'cat') continue;
+    if (body.bounds.min.y < DANGER_Y + 120) Composite.remove(engine.world, body);
+    else { body.plugin.merged = false; Sleeping.set(body, false); }
+  }
+  mergeQueue.clear(); dangerSince.clear();
+  isGameOver = false;
+  accumulatedTime = 0;
+  gameOverOverlay.classList.add('hidden');
+  updateReviveInventory();
+  addNextCat();
+  announce('🎟 复活成功！继续冲击哈基仙');
+  canvas.focus();
 }
 
 function roundedRect(context, x, y, width, height, radius) {
@@ -319,8 +397,8 @@ function drawMerges(now) {
 function render(now) {
   const delta = Math.min(now - lastFrame, 100);
   lastFrame = now;
-  accumulatedTime += delta;
-  while (accumulatedTime >= PHYSICS.step) {
+  accumulatedTime = isGameOver ? 0 : accumulatedTime + delta;
+  while (!isGameOver && accumulatedTime >= PHYSICS.step) {
     Engine.update(engine, PHYSICS.step);
     resolveMerges();
     accumulatedTime -= PHYSICS.step;
@@ -356,19 +434,32 @@ window.addEventListener('keydown', (event) => {
   aimX = clampAim(aimX, activeStage ?? 0);
 });
 
-document.querySelector('#restart').addEventListener('click', () => {
+function restartGame() {
+  clearTimeout(dropTimeout);
+  celebration.stop();
   for (const body of Composite.allBodies(engine.world)) if (body.label === 'cat') Composite.remove(engine.world, body);
   score = 0;
   scoreElement.textContent = '0';
   isGameOver = false;
+  hasWon = false;
+  rewards = createRewards();
+  updateReviveInventory();
+  accumulatedTime = 0;
+  document.querySelector('#reward-barrage').replaceChildren();
   dangerSince.clear();
   mergeQueue.clear();
   mergeFlash = [];
   round += 1;
   roundElement.textContent = String(round).padStart(3, '0');
   gameOverOverlay.classList.add('hidden');
+  victoryOverlay.classList.add('hidden');
   addNextCat();
-});
+  canvas.focus();
+}
+
+document.querySelector('#restart').addEventListener('click', restartGame);
+document.querySelector('#victory-restart').addEventListener('click', restartGame);
+reviveButton.addEventListener('click', reviveGame);
 
 bestElement.textContent = bestScore.toLocaleString('zh-CN');
 addNextCat();
